@@ -1,0 +1,385 @@
+<!--
+
+Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
+
+-->
+
+<html>
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <style>
+      #container {
+        width: 800px;
+        height: 600px;
+        position: relative;
+      }
+    </style>
+    <script>
+      // from http://paulirish.com/2011/requestanimationframe-for-smart-animating/
+      window.requestAnimFrame = (function () {
+        return (
+          window.requestAnimationFrame ||
+          window.webkitRequestAnimationFrame ||
+          window.mozRequestAnimationFrame ||
+          window.oRequestAnimationFrame ||
+          window.msRequestAnimationFrame ||
+          function (callback) {
+            window.setTimeout(callback, 1000 / 60);
+          }
+        );
+      })();
+
+      // modified from source found at: http://frugalcoder.us/post/2010/09/13/browser-detection.aspx
+      var kBrowserInfo = (function () {
+        var b = {};
+
+        if (!navigator) return b;
+
+        //browsermatch method...
+        function bm(re) {
+          var m =
+            navigator && navigator.userAgent && navigator.userAgent.match(re);
+          return m && m[1];
+        }
+
+        //setup browser detection
+        b.ie = parseFloat(bm(/MSIE (\d+\.\d+)/)) || null;
+        b.gecko = parseFloat(bm(/Gecko\/(\d+)/)) || null;
+        b.ff = parseFloat(bm(/Firefox\/(\d+\.\d+)/)) || null;
+        b.khtml = parseFloat(bm(/\((KHTML)/) && 1) || null;
+        b.webkit = parseFloat(bm(/AppleWebKit\/(\d+\.\d+)/));
+        b.chrome = parseFloat(b.webkit && bm(/Chrome\/(\d+\.\d+)/)) || null;
+        b.safari =
+          parseFloat(
+            b.webkit && bm(/Safari\/(\d+\.\d+)/) && bm(/Version\/(\d+\.\d+)/)
+          ) || null;
+        b.opera =
+          parseFloat(bm(/Opera\/(\d+\.\d+)/) && bm(/Version\/(\d+\.\d+)/)) ||
+          bm(/Opera\/(\d+\.\d+)/) ||
+          null;
+        b.android = navigator.userAgent.search("Android") > -1 || null;
+        b.ipad = navigator.userAgent.search("iPad") > -1 || null;
+        b.iphone = navigator.userAgent.search("iPhone") > -1 || null;
+        b.ipod = navigator.userAgent.search("iPod") > -1 || null;
+        b.ios = b.ipad || b.iphone || b.ipod || null;
+
+        //delete empty values
+        for (var x in b) {
+          if (b[x] === null || isNaN(b[x])) delete b[x];
+        }
+
+        //disable IE matching for older Opera versions.
+        if (b.opera && b.ie) delete b.ie;
+
+        return b;
+      })();
+
+      var kTotalBoxCount = 2000;
+      var kBoxWidth = 10;
+      var kBoxHeight = 10;
+      var kContainerWidth = 800;
+      var kContainerHeight = 600;
+      var testDuration = 5.0;
+
+      var kTransformName = "transform";
+      var kTransitionName = "transition";
+      if (kBrowserInfo.webkit != null) {
+        kTransformName = "-webkit-transform";
+        kTransitionName = "-webkit-transition";
+      }
+
+      var elements = Array();
+      var root;
+      var rootStartX = 0;
+      var rootStartY = 0;
+      var rootEndX = 0;
+      var rootEndY = 200;
+      var minZoom = 0.5;
+      var maxZoom = 4;
+      var currentTestIndex = 0;
+
+      var testMatrix = [];
+      for (let property of ["translate", "topleft"]) {  // "translate" or "topleft"
+        for (let willChange of [false, true]) {
+          for (let shouldForce3D of [false, true]) {
+            for (let perspective of [false, true]) {
+              for (let movingRoot of [false, true]) {
+                for (let staticChildren of [false, true]) {
+                  for (let integerCoordinates of [false, true]) {
+                    for (let zoomingRoot of [movingRoot]) {
+                      for (let rootWillChange of [false, true]) {
+                        for (let preserve3D of [false, true]) {
+                          for (let elementType of ["simple", "svg", "html"]) {  // "simple", "svg" or "html"
+                            for (let shadowRoot of [false, true]) {
+                              for (let shadowChildren of [false, true]) {
+                                for (let rootWillChange of [false, true]) {
+                                  testMatrix.push({
+                                    property,
+                                    shouldForce3D,
+                                    willChange,
+                                    perspective,
+                                    movingRoot,
+                                    staticChildren,
+                                    integerCoordinates,
+                                    zoomingRoot,
+                                    preserve3D,
+                                    elementType,
+                                    shadowRoot,
+                                    shadowChildren,
+                                    rootWillChange
+                                  });
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      function beginTesting() {
+        runNextTest();
+      }
+
+      function runNextTest() {
+        var config = testMatrix[currentTestIndex];
+        console.log(config);
+        if (currentTestIndex < testMatrix.length) {
+          runTest(config);
+          currentTestIndex += 1;
+        }
+      }
+
+      function runTest(config) {
+        let localConfig = Object.assign({}, config);
+        createElements(localConfig);
+        window.setTimeout(function () {
+          localConfig.frameCount = 0;
+          localConfig.startTime = new Date().getTime() / 1000.0;
+          window.requestAnimFrame(() => onFrame(localConfig));
+        }, 2000);
+      }
+
+      function endTest(frames, elapsedTime) {
+        console.log(`${frames} / ${elapsedTime} = ${frames / elapsedTime}`);
+      }
+
+      function onFrame(config) {
+        config.frameCount += 1;
+
+        var currentTime = new Date().getTime() / 1000.0 - config.startTime;
+        var percentComplete = currentTime / testDuration;
+
+        if (!config.staticChildren) {
+          for (var i = 0; i < elements.length; i++) {
+            xPos = elements[i].startX +
+                (elements[i].endX - elements[i].startX) * percentComplete
+            yPos = elements[i].startY +
+                (elements[i].endY - elements[i].startY) * percentComplete
+            if (config.integerCoordinates) {
+              xPos = Math.floor(xPos)
+              yPos = Math.floor(yPos)
+            }
+            setElementPosition(config, elements[i].element, xPos, yPos);
+          }
+        }
+
+        let rootTransform = ""
+
+        if (config.movingRoot) {
+            xPos = rootStartX +
+                (rootEndX - rootStartX) * percentComplete
+            yPos = rootStartY +
+                (rootEndY - rootStartY) * percentComplete
+            rootTransform += `translateX(${xPos}px) translateY(${yPos}px) `
+        }
+
+        if (config.zoomingRoot) {
+          let zoomPercent = percentComplete < 0.5
+              ? percentComplete * 2
+              : (1 - percentComplete) * 2
+          zoomPercent = Math.max(zoomPercent, 0)
+          let zoom = minZoom + (maxZoom - minZoom) * zoomPercent
+          rootTransform += `scale(${zoom})`
+        }
+
+        if (rootTransform !== "") {
+          root.style.transform = rootTransform
+        }
+
+        if (currentTime < testDuration) {
+          window.requestAnimFrame(() => onFrame(config));
+        } else {
+          endTest(config.frameCount, currentTime);
+          runNextTest();
+        }
+      }
+
+      function setElementPosition(config, element, xPos, yPos) {
+        if (config.property == "topleft") {
+          element.style.left = "" + xPos + "px";
+          element.style.top = "" + yPos + "px";
+        } else if (config.property == "translate") {
+          if (config.shouldForce3D == true) {
+            element.style[kTransformName] =
+              "translateX(" +
+              xPos +
+              "px) translateY(" +
+              yPos +
+              "px) rotateY(0deg)";
+          } else {
+            element.style[kTransformName] =
+              "translateX(" + xPos + "px) translateY(" + yPos + "px)";
+          }
+        }
+      }
+
+      function createElements(config) {
+        var containerElement = document.getElementById("container");
+        containerElement.innerHTML = "";
+        root = document.createElement("div");
+        containerElement.appendChild(root);
+
+        if (config.rootWillChange) {
+          root.style.willChange = "transform"
+        }
+
+        let innerRoot
+        if (config.shadowRoot) {
+          let shadow = root.attachShadow({mode: 'closed'})
+          innerRoot = document.createElement("div")
+          shadow.appendChild(innerRoot)
+        } else {
+          innerRoot = root
+        }
+        if (config.preserve3D) {
+          innerRoot.style.transformStyle = "preserve-3d"
+        }
+
+        if (config.perspective) {
+          innerRoot.style.perspective = "100px";
+        }
+
+        elements = Array();
+
+        for (var i = 0; i < kTotalBoxCount; i++) {
+          let element
+          switch (config.elementType) {
+            case "simple":
+              element = createSimpleElement()
+              break;
+            case "svg":
+              element = createComplexSvgElement()
+              break;
+            case "html":
+              element = createHtmlElement()
+              break;
+          }
+
+          let outerElement
+          if (config.shadowChildren) {
+            outerElement = document.createElement('div')
+            let shadow = outerElement.attachShadow({mode: 'closed'})
+            shadow.appendChild(element)
+          } else {
+            outerElement = element
+          }
+
+          if (config.property == "translate") {
+            outerElement.style.left = "0px";
+            outerElement.style.top = "0px";
+          }
+
+          outerElement.style.position = "absolute";
+
+          if (config.shouldForce3D == true) {
+            outerElement.style[kTransformName] = "rotateY(0deg)";
+          }
+          if (config.willChange) {
+            if (config.property == "topleft") {
+              outerElement.style.willChange = "left,top";
+            } else if (config.property == "translate") {
+              outerElement.style.willChange = "transform";
+            }
+          }
+          outerElement.id = "box-" + i;
+
+          var startX = Math.floor(
+            Math.random() * (kContainerWidth - kBoxWidth)
+          );
+          var startY = Math.floor(
+            Math.random() * (kContainerHeight - kBoxHeight)
+          );
+          var endX = Math.floor(Math.random() * (kContainerWidth - kBoxWidth));
+          var endY = Math.floor(
+            Math.random() * (kContainerHeight - kBoxHeight)
+          );
+
+          elements.push({
+            startX: startX,
+            startY: startY,
+            endX: endX,
+            endY: endY,
+            element: outerElement,
+          });
+
+          innerRoot.appendChild(outerElement);
+          setElementPosition(outerElement, startX, startY);
+        }
+      }
+
+      function createSimpleElement() {
+        var element = document.createElement("div");
+        element.style.border = "1px solid #333";
+        element.style.backgroundColor = "#acf";
+        element.style.width = "" + kBoxWidth + "px";
+        element.style.height = "" + kBoxHeight + "px";
+        return element
+      }
+
+      function createComplexSvgElement() {
+        let element = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+        for (let i = 0; i < 100; i++) {
+          let circle = document.createElementNS("http://www.w3.org/2000/svg", "circle")
+          circle.setAttribute("cx", Math.random() * 100)
+          circle.setAttribute("cy", Math.random() * 100)
+          circle.setAttribute("r", "3")
+          circle.setAttribute("fill", "#acf")
+          circle.setAttribute("stroke", "black")
+          element.appendChild(circle)
+        }
+        return element
+      }
+
+      function createHtmlElement() {
+        var element = document.createElement("div");
+        element.style.overflow = "scroll"
+        element.style.border = "1px solid #333";
+        element.style.background = "white";
+        element.style.width = "100px";
+        element.style.height = "100px";
+
+        let list = document.createElement('ol')
+        element.appendChild(list)
+
+        for (let i = 0; i < 10; i++) {
+          let item = document.createElement('li')
+          item.textContent = "Foo"
+          list.appendChild(item)
+        }
+
+        return element
+      }
+    </script>
+  </head>
+  <body onload="beginTesting()">
+    <div id="container"></div>
+  </body>
+  <html></html>
+</html>
