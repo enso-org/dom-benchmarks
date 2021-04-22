@@ -6,8 +6,11 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
 
 <html>
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <style>
+      body {
+        background: black
+      }
+
       #container {
         width: 800px;
         height: 600px;
@@ -15,121 +18,36 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
       }
     </style>
     <script>
-      // from http://paulirish.com/2011/requestanimationframe-for-smart-animating/
-      window.requestAnimFrame = (function () {
-        return (
-          window.requestAnimationFrame ||
-          window.webkitRequestAnimationFrame ||
-          window.mozRequestAnimationFrame ||
-          window.oRequestAnimationFrame ||
-          window.msRequestAnimationFrame ||
-          function (callback) {
-            window.setTimeout(callback, 1000 / 60);
-          }
-        );
-      })();
+      let testDuration = 5.0
+      let numElements = 1000
 
-      // modified from source found at: http://frugalcoder.us/post/2010/09/13/browser-detection.aspx
-      var kBrowserInfo = (function () {
-        var b = {};
-
-        if (!navigator) return b;
-
-        //browsermatch method...
-        function bm(re) {
-          var m =
-            navigator && navigator.userAgent && navigator.userAgent.match(re);
-          return m && m[1];
-        }
-
-        //setup browser detection
-        b.ie = parseFloat(bm(/MSIE (\d+\.\d+)/)) || null;
-        b.gecko = parseFloat(bm(/Gecko\/(\d+)/)) || null;
-        b.ff = parseFloat(bm(/Firefox\/(\d+\.\d+)/)) || null;
-        b.khtml = parseFloat(bm(/\((KHTML)/) && 1) || null;
-        b.webkit = parseFloat(bm(/AppleWebKit\/(\d+\.\d+)/));
-        b.chrome = parseFloat(b.webkit && bm(/Chrome\/(\d+\.\d+)/)) || null;
-        b.safari =
-          parseFloat(
-            b.webkit && bm(/Safari\/(\d+\.\d+)/) && bm(/Version\/(\d+\.\d+)/)
-          ) || null;
-        b.opera =
-          parseFloat(bm(/Opera\/(\d+\.\d+)/) && bm(/Version\/(\d+\.\d+)/)) ||
-          bm(/Opera\/(\d+\.\d+)/) ||
-          null;
-        b.android = navigator.userAgent.search("Android") > -1 || null;
-        b.ipad = navigator.userAgent.search("iPad") > -1 || null;
-        b.iphone = navigator.userAgent.search("iPhone") > -1 || null;
-        b.ipod = navigator.userAgent.search("iPod") > -1 || null;
-        b.ios = b.ipad || b.iphone || b.ipod || null;
-
-        //delete empty values
-        for (var x in b) {
-          if (b[x] === null || isNaN(b[x])) delete b[x];
-        }
-
-        //disable IE matching for older Opera versions.
-        if (b.opera && b.ie) delete b.ie;
-
-        return b;
-      })();
-
-      var kTotalBoxCount = 2000;
-      var kBoxWidth = 10;
-      var kBoxHeight = 10;
-      var kContainerWidth = 800;
-      var kContainerHeight = 600;
-      var testDuration = 5.0;
-
-      var kTransformName = "transform";
-      var kTransitionName = "transition";
-      if (kBrowserInfo.webkit != null) {
-        kTransformName = "-webkit-transform";
-        kTransitionName = "-webkit-transition";
-      }
-
-      var elements = Array();
-      var root;
-      var rootStartX = 0;
-      var rootStartY = 0;
-      var rootEndX = 0;
-      var rootEndY = 200;
-      var minZoom = 0.5;
-      var maxZoom = 4;
-      var currentTestIndex = 0;
-
-      var testMatrix = [];
-      for (let property of ["translate", "topleft"]) {  // "translate" or "topleft"
-        for (let willChange of [false, true]) {
-          for (let shouldForce3D of [false, true]) {
-            for (let perspective of [false, true]) {
-              for (let movingRoot of [false, true]) {
-                for (let staticChildren of [false, true]) {
-                  for (let integerCoordinates of [false, true]) {
-                    for (let zoomingRoot of [movingRoot]) {
-                      for (let rootWillChange of [false, true]) {
-                        for (let preserve3D of [false, true]) {
-                          for (let elementType of ["simple", "svg", "html"]) {  // "simple", "svg" or "html"
-                            for (let shadowRoot of [false, true]) {
-                              for (let shadowChildren of [false, true]) {
-                                for (let rootWillChange of [false, true]) {
-                                  testMatrix.push({
-                                    property,
-                                    shouldForce3D,
-                                    willChange,
-                                    perspective,
-                                    movingRoot,
-                                    staticChildren,
-                                    integerCoordinates,
-                                    zoomingRoot,
-                                    preserve3D,
-                                    elementType,
-                                    shadowRoot,
-                                    shadowChildren,
-                                    rootWillChange
-                                  });
-                                }
-                              }
+      let testMatrix = [];
+      for (let elementType of ["svg", "html"]) {  // "simple", "svg" or "html"
+        for (let movingRoot of [false, true]) {
+          for (let zoomingRoot of [movingRoot]) {
+            for (let movingChildren of movingRoot ? [false, true] : [true]) {
+              for (let translateMethod of ["translate", "topleft"]) {  // "translate" or "topleft"
+                for (let zoomMethod of ["scale", "translateZ"]) {  // "scale" or "translateZ"
+                  for (let rootWillChange of [false, true]) {
+                    for (let childrenWillChange of [false, true]) {
+                      for (let shouldForce3D of [false, true]) {
+                        for (let perspective of zoomMethod === "translateZ" ? [true] : [false, true]) {
+                          for (let preserve3D of [false, true]) {
+                            for (let shadowChildren of [false, true]) {
+                              testMatrix.push({
+                                translateMethod,
+                                shouldForce3D,
+                                childrenWillChange,
+                                perspective,
+                                movingRoot,
+                                movingChildren,
+                                zoomingRoot,
+                                preserve3D,
+                                elementType,
+                                shadowChildren,
+                                rootWillChange,
+                                zoomMethod
+                              });
                             }
                           }
                         }
@@ -143,26 +61,38 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
         }
       }
 
+      var elements = Array();
+      var root;
+      var rootStartX = 0;
+      var rootStartY = 0;
+      var rootEndX = 200;
+      var rootEndY = 0;
+      var minZoom = 0.5;
+      var maxZoom = 4;
+      var currentTestIndex = 0;
+      var perspective = 3000;
+
       function beginTesting() {
         runNextTest();
       }
 
       function runNextTest() {
-        var config = testMatrix[currentTestIndex];
-        console.log(config);
         if (currentTestIndex < testMatrix.length) {
+          var config = testMatrix[currentTestIndex];
+          console.log(config);
           runTest(config);
           currentTestIndex += 1;
+        } else {
+          console.log(testMatrix)
         }
       }
 
       function runTest(config) {
-        let localConfig = Object.assign({}, config);
-        createElements(localConfig);
+        createElements(config);
         window.setTimeout(function () {
-          localConfig.frameCount = 0;
-          localConfig.startTime = new Date().getTime() / 1000.0;
-          window.requestAnimFrame(() => onFrame(localConfig));
+          config.frameCount = 0;
+          config.startTime = new Date().getTime() / 1000.0;
+          window.requestAnimationFrame(() => onFrame(config));
         }, 2000);
       }
 
@@ -176,16 +106,12 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
         var currentTime = new Date().getTime() / 1000.0 - config.startTime;
         var percentComplete = currentTime / testDuration;
 
-        if (!config.staticChildren) {
+        if (config.movingChildren) {
           for (var i = 0; i < elements.length; i++) {
             xPos = elements[i].startX +
                 (elements[i].endX - elements[i].startX) * percentComplete
             yPos = elements[i].startY +
                 (elements[i].endY - elements[i].startY) * percentComplete
-            if (config.integerCoordinates) {
-              xPos = Math.floor(xPos)
-              yPos = Math.floor(yPos)
-            }
             setElementPosition(config, elements[i].element, xPos, yPos);
           }
         }
@@ -206,7 +132,18 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
               : (1 - percentComplete) * 2
           zoomPercent = Math.max(zoomPercent, 0)
           let zoom = minZoom + (maxZoom - minZoom) * zoomPercent
-          rootTransform += `scale(${zoom})`
+          switch (config.zoomMethod) {
+            case "scale":
+              rootTransform += `scale(${zoom}) `
+              break
+            case "translateZ":
+              rootTransform += `translateZ(${perspective - perspective / zoom}px) `
+              break
+          }
+        }
+
+        if (config.shouldForce3D) {
+          rootTransform += "rotateY(10deg) "
         }
 
         if (rootTransform !== "") {
@@ -214,27 +151,25 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
         }
 
         if (currentTime < testDuration) {
-          window.requestAnimFrame(() => onFrame(config));
+          window.requestAnimationFrame(() => onFrame(config));
         } else {
+          config.elapsedTime = currentTime
+          config.fps = config.frameCount / config.elapsedTime
           endTest(config.frameCount, currentTime);
           runNextTest();
         }
       }
 
       function setElementPosition(config, element, xPos, yPos) {
-        if (config.property == "topleft") {
+        if (config.translateMethod == "topleft") {
           element.style.left = "" + xPos + "px";
           element.style.top = "" + yPos + "px";
-        } else if (config.property == "translate") {
+        } else if (config.translateMethod == "translate") {
           if (config.shouldForce3D == true) {
-            element.style[kTransformName] =
-              "translateX(" +
-              xPos +
-              "px) translateY(" +
-              yPos +
-              "px) rotateY(0deg)";
+            element.style.transform =
+              "translateX(" + xPos + "px) translateY(" + yPos +  "px) rotateY(-10deg)";
           } else {
-            element.style[kTransformName] =
+            element.style.transform =
               "translateX(" + xPos + "px) translateY(" + yPos + "px)";
           }
         }
@@ -250,25 +185,20 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
           root.style.willChange = "transform"
         }
 
-        let innerRoot
-        if (config.shadowRoot) {
-          let shadow = root.attachShadow({mode: 'closed'})
-          innerRoot = document.createElement("div")
-          shadow.appendChild(innerRoot)
-        } else {
-          innerRoot = root
-        }
         if (config.preserve3D) {
-          innerRoot.style.transformStyle = "preserve-3d"
+          root.style.transformStyle = "preserve-3d"
         }
 
         if (config.perspective) {
-          innerRoot.style.perspective = "100px";
+          containerElement.style.perspective = `${perspective}px`;
+          if (!config.preserve3D) {
+            root.style.perspective = `${perspective}px`;
+          }
         }
 
         elements = Array();
 
-        for (var i = 0; i < kTotalBoxCount; i++) {
+        for (var i = 0; i < numElements; i++) {
           let element
           switch (config.elementType) {
             case "simple":
@@ -285,41 +215,35 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
           let outerElement
           if (config.shadowChildren) {
             outerElement = document.createElement('div')
-            let shadow = outerElement.attachShadow({mode: 'closed'})
+            let shadow = outerElement.attachShadow({mode: 'open'})
             shadow.appendChild(element)
           } else {
             outerElement = element
           }
 
-          if (config.property == "translate") {
+          if (config.translateMethod == "translate") {
             outerElement.style.left = "0px";
             outerElement.style.top = "0px";
           }
 
           outerElement.style.position = "absolute";
 
-          if (config.shouldForce3D == true) {
-            outerElement.style[kTransformName] = "rotateY(0deg)";
-          }
-          if (config.willChange) {
-            if (config.property == "topleft") {
+          if (config.childrenWillChange) {
+            if (config.translateMethod == "topleft") {
               outerElement.style.willChange = "left,top";
-            } else if (config.property == "translate") {
+            } else if (config.translateMethod == "translate") {
               outerElement.style.willChange = "transform";
             }
           }
           outerElement.id = "box-" + i;
 
-          var startX = Math.floor(
-            Math.random() * (kContainerWidth - kBoxWidth)
-          );
-          var startY = Math.floor(
-            Math.random() * (kContainerHeight - kBoxHeight)
-          );
-          var endX = Math.floor(Math.random() * (kContainerWidth - kBoxWidth));
-          var endY = Math.floor(
-            Math.random() * (kContainerHeight - kBoxHeight)
-          );
+          let containerWidth = 800
+          let containerHeight = 600
+
+          var startX = Math.floor(Math.random() * containerWidth);
+          var startY = Math.floor(Math.random() * containerHeight);
+          var endX = Math.floor(Math.random() * containerWidth);
+          var endY = Math.floor(Math.random() * containerHeight);
 
           elements.push({
             startX: startX,
@@ -329,8 +253,8 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
             element: outerElement,
           });
 
-          innerRoot.appendChild(outerElement);
-          setElementPosition(outerElement, startX, startY);
+          root.appendChild(outerElement);
+          setElementPosition(config, outerElement, startX, startY);
         }
       }
 
@@ -338,8 +262,8 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
         var element = document.createElement("div");
         element.style.border = "1px solid #333";
         element.style.backgroundColor = "#acf";
-        element.style.width = "" + kBoxWidth + "px";
-        element.style.height = "" + kBoxHeight + "px";
+        element.style.width = "10px";
+        element.style.height = "10px";
         return element
       }
 
@@ -368,7 +292,7 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
         let list = document.createElement('ol')
         element.appendChild(list)
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 100; i++) {
           let item = document.createElement('li')
           item.textContent = "Foo"
           list.appendChild(item)
