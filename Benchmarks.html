@@ -20,35 +20,41 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
     </style>
     <script>
       let testDuration = 5.0
-      let numElements = 1000
+      let numElements = 3000
 
       let testMatrix = [];
-      for (let elementType of ["svg", "html"]) {  // "simple", "svg" or "html"
-        for (let movingRoot of [false, true]) {
+      for (let elementType of ["svg"]) {  // "simple", "svg" or "html"
+        for (let movingRoot of [true]) {
           for (let zoomingRoot of [movingRoot]) {
-            for (let movingChildren of movingRoot ? [false, true] : [true]) {
+            for (let movingChildren of movingRoot ? [false] : [true]) {
               for (let translateMethod of ["translate", "topleft"]) {  // "translate" or "topleft"
                 for (let zoomMethod of ["scale", "translateZ"]) {  // "scale" or "translateZ"
                   for (let rootWillChange of [false, true]) {
                     for (let childrenWillChange of [false, true]) {
-                      for (let shouldForce3D of [false, true]) {
-                        for (let perspective of zoomMethod === "translateZ" ? [true] : [false, true]) {
-                          for (let preserve3D of [false, true]) {
-                            for (let shadowChildren of [false, true]) {
-                              testMatrix.push({
-                                translateMethod,
-                                shouldForce3D,
-                                childrenWillChange,
-                                perspective,
-                                movingRoot,
-                                movingChildren,
-                                zoomingRoot,
-                                preserve3D,
-                                elementType,
-                                shadowChildren,
-                                rootWillChange,
-                                zoomMethod
-                              });
+                      for (let rootForce3D of [false, true]) {
+                        for (let childrenForce3D of [false, true]) {
+                          for (let rootPerspective of zoomMethod === "translateZ" ? [true] : [false, true]) {
+                            for (let childrenPerspective of [false, true]) {
+                              for (let preserve3D of [false, true]) {
+                                for (let shadowChildren of [false, true]) {
+                                  testMatrix.push({
+                                    elementType,
+                                    movingRoot,
+                                    zoomingRoot,
+                                    movingChildren,
+                                    translateMethod,
+                                    zoomMethod,
+                                    rootWillChange,
+                                    childrenWillChange,
+                                    rootForce3D,
+                                    childrenForce3D,
+                                    rootPerspective,
+                                    childrenPerspective,
+                                    preserve3D,
+                                    shadowChildren,
+                                  });
+                                }
+                              }
                             }
                           }
                         }
@@ -143,7 +149,7 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
           }
         }
 
-        if (config.shouldForce3D) {
+        if (config.rootForce3D) {
           rootTransform += "rotateY(10deg) "
         }
 
@@ -165,8 +171,11 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
         if (config.translateMethod == "topleft") {
           element.style.left = "" + xPos + "px";
           element.style.top = "" + yPos + "px";
+          if (config.childrenForce3D) {
+            element.style.transform = "rotateY(-10deg)"
+          }
         } else if (config.translateMethod == "translate") {
-          if (config.shouldForce3D == true) {
+          if (config.childrenForce3D) {
             element.style.transform =
               "translateX(" + xPos + "px) translateY(" + yPos +  "px) rotateY(-10deg)";
           } else {
@@ -190,11 +199,14 @@ Based on https://blog.tumult.com/2013/02/28/transform-translate-vs-top-left/
           root.style.transformStyle = "preserve-3d"
         }
 
-        if (config.perspective) {
+        if (config.rootPerspective) {
           containerElement.style.perspective = `${perspective}px`;
-          if (!config.preserve3D) {
-            root.style.perspective = `${perspective}px`;
-          }
+        } else {
+          containerElement.style.removeProperty("perspective");
+        }
+        
+        if (config.childrenPerspective) {
+          root.style.perspective = `${perspective}px`;
         }
 
         elements = Array();
